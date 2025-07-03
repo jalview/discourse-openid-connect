@@ -72,7 +72,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
   def after_authenticate(auth_token, existing_account: nil)
     result = super
-    handle_group_memberships(result.user, auth_token)) if result.user
+    handle_group_memberships(result.user, auth_token) if result.user
     result
   end
 
