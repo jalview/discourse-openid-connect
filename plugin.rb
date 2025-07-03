@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 # name: discourse-openid-connect
-# about: Add support for openid-connect as a login provider
+# about: Allows users to login to your forum using an OpenID Connect provider as authentication.
+# meta_topic_id: 103632
 # version: 1.0
 # authors: David Taylor
 # url: https://github.com/discourse/discourse-openid-connect
@@ -11,6 +12,8 @@ enabled_site_setting :openid_connect_enabled
 require_relative "lib/openid_connect_faraday_formatter"
 require_relative "lib/omniauth_open_id_connect"
 require_relative "lib/openid_connect_authenticator"
+
+GlobalSetting.add_default :openid_connect_request_timeout_seconds, 10
 
 # RP-initiated logout
 # https://openid.net/specs/openid-connect-rpinitiated-1_0.html
@@ -33,19 +36,29 @@ on(:before_session_destroy) do |data|
 
   end_session_endpoint = authenticator.discovery_document["end_session_endpoint"].presence
   if !end_session_endpoint
-    authenticator.oidc_log "Logout: No end_session_endpoint found in discovery document", error: true
+    authenticator.oidc_log "Logout: No end_session_endpoint found in discovery document",
+                           error: true
     next
+  end
+
+  begin
+    uri = URI.parse(end_session_endpoint)
+  rescue URI::Error
+    authenticator.oidc_log "Logout: unable to parse end_session_endpoint #{end_session_endpoint}",
+                           error: true
   end
 
   authenticator.oidc_log "Logout: Redirecting user_id=#{data[:user].id} to end_session_endpoint"
 
-  redirect_uri = end_session_endpoint
-  redirect_uri += "?id_token_hint=#{token}"
+  params = URI.decode_www_form(String(uri.query))
+
+  params << ["id_token_hint", token]
 
   post_logout_redirect = SiteSetting.openid_connect_rp_initiated_logout_redirect.presence
-  redirect_uri += "&post_logout_redirect_uri=#{post_logout_redirect}" if post_logout_redirect
+  params << ["post_logout_redirect_uri", post_logout_redirect] if post_logout_redirect
 
-  data[:redirect_url] = redirect_uri
+  uri.query = URI.encode_www_form(params)
+  data[:redirect_url] = uri.to_s
 end
 
 auth_provider authenticator: OpenIDConnectAuthenticator.new
