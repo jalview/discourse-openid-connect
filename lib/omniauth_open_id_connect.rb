@@ -178,7 +178,7 @@ module ::OmniAuth
         @raw_info ||=
           begin
             info = access_token.get(options[:client_options][:userinfo_endpoint]).parsed
-            verbose_log("Fetched userinfo response\n\n#{info.to_yaml}")
+            verbose_log("CONFIRMED Fetched userinfo response\n\n#{info.to_yaml}")
             info
           end
 
