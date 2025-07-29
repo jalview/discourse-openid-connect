@@ -66,13 +66,16 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
     oidc_log("Discovery document loaded from cache") if from_cache
     oidc_log("Discovery document is\n\n#{result.to_yaml}")
+    oidc_log("##### TEST")
 
     result
   end
 
   def after_authenticate(auth_token, existing_account: nil)
+    oidc_log("##### AFTER_AUTHENTICATE")
     result = super
     handle_group_memberships(result.user, auth_token) if result.user
+    oidc_log("##### RESULT=#{result}")
     result
   end
 
