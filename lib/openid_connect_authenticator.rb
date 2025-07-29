@@ -92,6 +92,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     removed = []
     
     group_membership_claim_map.each do |gmc|
+      oidc_log("##### GMC=#{gmc}")
       if value = association.info[gmc.claim]
         is_member = [true, "true", "t"].include?(value) ||
           value == gmc.group.name ||
@@ -120,9 +121,11 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
   
   def group_membership_claim_map
     setting_list = SiteSetting.openid_connect_group_membership_claims.split('|')
-    
+    oidc_log("##### SETTING_LIST=#{setting_list}")
     claims = {}
     setting_list.each do |result, setting|
+      oidc_log("##### RESULT=#{result}")
+      oidc_log("##### SETTING=#{setting}")
       parts = setting.split('~~')
       claims[parts.second] = [parts.first, parts.last.split(',')]
     end
