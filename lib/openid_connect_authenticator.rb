@@ -70,6 +70,87 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     result
   end
 
+
+  # Start of crowd groups code insertion
+
+  def set_groups(user, auth)
+    return unless SiteSetting.oidc_groups_enabled
+
+    user_oidc_groups = (auth[:info] && auth[:info].groups) ? auth[:info].groups : nil
+    group_map = {}
+    check_groups = {}
+
+    SiteSetting.oidc_groups_mapping.split("|").each do |map|
+      keyval = map.split(":", 2)
+      group_map[keyval[0]] = keyval[1]
+      check_groups[keyval[1]] = 0
+    end
+
+    if !(user_oidc_groups == nil || group_map.empty?)
+      user_oidc_groups.each { |user_oidc_group|
+        if group_map.has_key?(user_oidc_group) || !SiteSetting.oidc_groups_remove_unmapped_groups
+          result = nil
+
+          discourse_groups = group_map[user_oidc_group] || ""
+          discourse_groups.split(",").each { |discourse_group|
+            next unless discourse_group
+
+            check_groups[discourse_group] = 1
+            actual_group = Group.find_by(name: discourse_group)
+            next if actual_group.automatic # skip if it's an auto_group
+
+            if (!actual_group)
+              Rails.logger.warn("WARN: oidc_group '#{user_oidc_group}' is configured to map to discourse_group '#{discourse_group}' but this does not seem to exist")
+              next
+            end
+            result = actual_group.add(user)
+            Rails.logger.debug("DEBUG: user_oidc_group '#{user_oidc_group}' mapped to discourse_group '#{discourse_group}' added to user '#{user.username}'") if result && SiteSetting.oidc_verbose_log
+          }
+        end
+      }
+    end
+
+    check_groups.keys.each { |discourse_group|
+      actual_group = Group.find_by(name: discourse_group)
+      next unless actual_group
+      next if actual_group.automatic # skip if it's an auto_group
+      next if check_groups[discourse_group] > 0
+      result = actual_group.remove(user)
+      Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.oidc_verbose_log
+    }
+  end
+
+  def after_authenticate(auth)
+    oidc_uid = auth[:uid]
+    oidc_info = auth[:info]
+    result = Auth::Result.new
+    result.email_valid = true
+
+    # Allow setting to decide whether to validate email or not. Some Jira setups don't.
+    result.email_valid = SiteSetting.oidc_validate_email
+    result.user = User.where(username: oidc_uid).first
+
+    if (!result.user)
+      result.user = User.new
+      result.user.name = oidc_info.name
+      result.user.username = oidc_uid
+      result.user.email = oidc_info.email
+      result.user.save
+    end
+    set_groups(user, auth)
+    result
+  end
+
+  def after_create_account(user, auth)
+    set_groups(user, auth)
+  end
+
+
+
+
+  # End of crowd groups code insertion
+
+
   def oidc_log(message, error: false)
     if error
       Rails.logger.error("OIDC Log: #{message}")
