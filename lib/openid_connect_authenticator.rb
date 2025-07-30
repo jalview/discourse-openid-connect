@@ -74,13 +74,13 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
   # Start of crowd groups code insertion
 
   def set_groups(user, auth)
-    return unless SiteSetting.oidc_groups_enabled
+    return unless SiteSetting.openid_connect_groups_enabled
 
     user_oidc_groups = (auth[:info] && auth[:info].groups) ? auth[:info].groups : nil
     group_map = {}
     check_groups = {}
 
-    SiteSetting.oidc_groups_mapping.split("|").each do |map|
+    SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
       check_groups[keyval[1]] = 0
@@ -88,7 +88,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
     if !(user_oidc_groups == nil || group_map.empty?)
       user_oidc_groups.each { |user_oidc_group|
-        if group_map.has_key?(user_oidc_group) || !SiteSetting.oidc_groups_remove_unmapped_groups
+        if group_map.has_key?(user_oidc_group) || !SiteSetting.openid_connect_groups_remove_unmapped_groups
           result = nil
 
           discourse_groups = group_map[user_oidc_group] || ""
@@ -104,7 +104,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
               next
             end
             result = actual_group.add(user)
-            Rails.logger.debug("DEBUG: user_oidc_group '#{user_oidc_group}' mapped to discourse_group '#{discourse_group}' added to user '#{user.username}'") if result && SiteSetting.oidc_verbose_log
+            Rails.logger.debug("DEBUG: user_oidc_group '#{user_oidc_group}' mapped to discourse_group '#{discourse_group}' added to user '#{user.username}'") if result && SiteSetting.openid_connect_verbose_log
           }
         end
       }
@@ -116,7 +116,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       next if actual_group.automatic # skip if it's an auto_group
       next if check_groups[discourse_group] > 0
       result = actual_group.remove(user)
-      Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.oidc_verbose_log
+      Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
     }
   end
 
@@ -127,7 +127,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     result.email_valid = true
 
     # Allow setting to decide whether to validate email or not. Some Jira setups don't.
-    result.email_valid = SiteSetting.oidc_validate_email
+    result.email_valid = SiteSetting.openid_connect_validate_email
     result.user = User.where(username: oidc_uid).first
 
     if (!result.user)
