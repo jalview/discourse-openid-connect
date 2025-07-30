@@ -126,8 +126,8 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     result = Auth::Result.new
     result.email_valid = true
 
-    # Allow setting to decide whether to validate email or not. Some Jira setups don't.
-    result.email_valid = SiteSetting.openid_connect_validate_email
+    ## Allow setting to decide whether to validate email or not. Some Jira setups don't.
+    #result.email_valid = SiteSetting.openid_connect_validate_email
     result.user = User.where(username: oidc_uid).first
 
     if (!result.user)
