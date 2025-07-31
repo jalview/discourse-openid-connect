@@ -216,9 +216,9 @@ module ::OmniAuth
         hash = {}
         hash[:raw_info] = options.use_userinfo ? userinfo_response : id_token_info
         hash[:id_token] = access_token["id_token"]
+        verbose_log("##### extra=\n#{(prune! hash).pretty_inspect}")
         prune! hash
       end
-      verbose_log("##### extra=\n#{extra.pretty_inspect}")
 
       private
 
