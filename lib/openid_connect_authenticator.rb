@@ -122,9 +122,6 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
   def after_authenticate(auth)
 
-    oidc_log("##### AFTER_AUTHENTICATE")
-    oidc_log("##### auth=#{auth.pretty_inspect}")
-
     oidc_uid = auth[:uid]
     oidc_info = auth[:info]
     result = Auth::Result.new
@@ -141,6 +138,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       result.user.email = oidc_info.email
       result.user.save
     end
+    oidc_log("##### auth=#{auth.pretty_inspect}")
     oidc_log("##### result.user=#{result.user.pretty_inspect}")
     oidc_log("##### oidc_info=#{oidc_info.pretty_inspect}")
 
