@@ -141,8 +141,8 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       result.user.email = oidc_info.email
       result.user.save
     end
-    oidc_log("##### result.user=#{result.user.inspect}")
-    oidc_log("##### oidc_info=#{oidc_info.inspect}")
+    oidc_log("##### result.user=#{result.user.pretty_inspect}")
+    oidc_log("##### oidc_info=#{oidc_info.pretty_inspect}")
 
     set_groups(result.user, auth)
     result
