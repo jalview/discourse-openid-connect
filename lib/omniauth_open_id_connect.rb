@@ -196,12 +196,11 @@ module ::OmniAuth
 
       uid { id_token_info["sub"] }
 
-      #verbose_log("##### options=\n#{options.to_yaml}")
-      #verbose_log("##### userinfo_response["groups"]=\n#{userinfo_response["groups"].to_yaml}")
-      verbose_log("##### id_token_info=\n#{id_token_info.to_yaml}")
-
       info do
         data_source = options.use_userinfo ? userinfo_response : id_token_info
+        verbose_log("##### options=\n#{options.to_yaml}")
+        verbose_log("##### userinfo_response["groups"]=\n#{userinfo_response["groups"].to_yaml}")
+        verbose_log("##### id_token_info=\n#{id_token_info.to_yaml}")
         prune!(
           name: data_source["name"],
           email: data_source["email"],
