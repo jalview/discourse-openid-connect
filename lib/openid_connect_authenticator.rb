@@ -130,6 +130,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     ## Allow setting to decide whether to validate email or not. Some Jira setups don't.
     #result.email_valid = SiteSetting.openid_connect_validate_email
     result.user = User.where(username: oidc_info.nickname).first
+    oidc_log("Found user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
 
     if (!result.user)
       result.user = User.new
@@ -137,10 +138,10 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       result.user.username = oidc_uid
       result.user.email = oidc_info.email
       result.user.save
+      oidc_log("Created user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
     end
-    oidc_log("##### auth=#{auth.pretty_inspect}")
-    oidc_log("##### result.user=#{result.user.pretty_inspect}")
-    oidc_log("##### oidc_info=#{oidc_info.pretty_inspect}")
+    oidc_log("Auth info is #{auth.pretty_inspect}") if auth && SiteSetting.openid_connect_verbose_log
+    oidc_log("Collected OIDC Info #{oidc_info.pretty_inspect}") if oidc_info && SiteSetting.openid_connect_verbose_log
 
     set_groups(result.user, auth)
     result
