@@ -212,7 +212,7 @@ module ::OmniAuth
       extra do
         hash = {}
         verbose_log("##### options=\n#{options.to_yaml}")
-        verbose_log("##### userinfo_response.groups=\n#{userinfo_response.groups.to_yaml}")
+        verbose_log("##### userinfo_response["groups"]=\n#{userinfo_response["groups"].to_yaml}")
         verbose_log("##### id_token_info=\n#{id_token_info.to_yaml}")
         hash[:raw_info] = options.use_userinfo ? userinfo_response : id_token_info
         hash[:id_token] = access_token["id_token"]
