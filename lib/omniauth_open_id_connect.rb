@@ -205,6 +205,7 @@ module ::OmniAuth
           last_name: data_source["family_name"],
           nickname: data_source["preferred_username"],
           image: data_source["picture"],
+          groups: data_source["groups"],
         )
       end
 
