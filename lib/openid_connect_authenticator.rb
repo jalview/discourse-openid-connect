@@ -100,14 +100,14 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
             check_groups[discourse_group] = 1
             actual_group = Group.find_by(name: discourse_group)
             if (!actual_group)
-              oidc_log("WARN: OIDC group '#{user_oidc_group}' maps to Group '#{discourse_group}' but this does not seem to exist")
+              oidc_log("OIDC group '#{user_oidc_group}' maps to Group '#{discourse_group}' but this does not seem to exist")
               next
             end
             if actual_group.automatic # skip if it's an auto_group
-              oidc_log("WARN: Group '#{discourse_group}' is an automatic group so membership cannot is unchanged")
+              oidc_log("Group '#{discourse_group}' is an automatic group so membership cannot is unchanged")
             end
             result = actual_group.add(user)
-            oidc_log("DEBUG: OIDC group '#{user_oidc_group}' mapped to Group '#{discourse_group}'. User '#{user.username}' has been added") if result && SiteSetting.openid_connect_verbose_log
+            oidc_log("OIDC group '#{user_oidc_group}' mapped to Group '#{discourse_group}'. User '#{user.username}' has been added") if result && SiteSetting.openid_connect_verbose_log
           }
         end
       }
