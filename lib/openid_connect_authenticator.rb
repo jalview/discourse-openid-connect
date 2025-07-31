@@ -99,7 +99,6 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
             check_groups[discourse_group] = 1
             actual_group = Group.find_by(name: discourse_group)
-            if !actual_group
             if (!actual_group)
               Rails.logger.warn("WARN: oidc_group '#{user_oidc_group}' is configured to map to discourse_group '#{discourse_group}' but this does not seem to exist")
               next
