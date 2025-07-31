@@ -83,12 +83,14 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
-      check_groups[keyval[1]] = 0
+      keyval[1].split(",").each { |discourse_group|
+        check_groups[discourse_group] = 0
+      }
     end
 
     if !(user_oidc_groups == nil || group_map.empty?)
       user_oidc_groups.each { |user_oidc_group|
-        if group_map.has_key?(user_oidc_group) || !SiteSetting.openid_connect_groups_remove_unmapped_groups
+        if group_map.has_key?(user_oidc_group) #??? || !SiteSetting.openid_connect_groups_remove_unmapped_groups
           result = nil
 
           discourse_groups = group_map[user_oidc_group] || ""
@@ -110,14 +112,16 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       }
     end
 
-    check_groups.keys.each { |discourse_group|
-      actual_group = Group.find_by(name: discourse_group)
-      next unless actual_group
-      next if actual_group.automatic # skip if it's an auto_group
-      next if check_groups[discourse_group] > 0
-      result = actual_group.remove(user)
-      Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
-    }
+    if SiteSetting.openid_connect_groups_remove_unmapped_groups
+      check_groups.keys.each { |discourse_group|
+        actual_group = Group.find_by(name: discourse_group)
+        next unless actual_group
+        next if actual_group.automatic # skip if it's an auto_group
+        next if check_groups[discourse_group] > 0
+        result = actual_group.remove(user)
+        Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
+      }
+    end
   end
 
   def after_authenticate(auth)
@@ -130,7 +134,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     ## Allow setting to decide whether to validate email or not. Some Jira setups don't.
     #result.email_valid = SiteSetting.openid_connect_validate_email
     result.user = User.where(username: oidc_info.nickname).first
-    oidc_log("Found user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
+    oidc_log("Found existing user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
 
     if (!result.user)
       result.user = User.new
@@ -138,7 +142,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       result.user.username = oidc_uid
       result.user.email = oidc_info.email
       result.user.save
-      oidc_log("Created user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
+      oidc_log("Created new user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
     end
     oidc_log("Auth info is #{auth.pretty_inspect}") if auth && SiteSetting.openid_connect_verbose_log
     oidc_log("Collected OIDC Info #{oidc_info.pretty_inspect}") if oidc_info && SiteSetting.openid_connect_verbose_log
