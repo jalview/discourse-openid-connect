@@ -197,7 +197,7 @@ module ::OmniAuth
       uid { id_token_info["sub"] }
 
       verbose_log("##### options=\n#{options.to_yaml}")
-      verbose_log("##### userinfo_response["groups"]=\n#{userinfo_response["groups"].to_yaml}")
+      #verbose_log("##### userinfo_response["groups"]=\n#{userinfo_response["groups"].to_yaml}")
       verbose_log("##### id_token_info=\n#{id_token_info.to_yaml}")
 
       info do
@@ -209,7 +209,7 @@ module ::OmniAuth
           last_name: data_source["family_name"],
           nickname: data_source["preferred_username"],
           image: data_source["picture"],
-          #groups: data_source["groups"],
+          groups: data_source["groups"],
         )
       end
 
