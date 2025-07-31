@@ -99,11 +99,13 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
             check_groups[discourse_group] = 1
             actual_group = Group.find_by(name: discourse_group)
-            next if actual_group.automatic # skip if it's an auto_group
-
+            if !actual_group
             if (!actual_group)
               Rails.logger.warn("WARN: oidc_group '#{user_oidc_group}' is configured to map to discourse_group '#{discourse_group}' but this does not seem to exist")
               next
+            end
+            if actual_group.automatic # skip if it's an auto_group
+              Rails.logger.warn("WARN: discourse group '#{discourse_group}' is an automatic group so membership is unchanged")
             end
             result = actual_group.add(user)
             Rails.logger.debug("DEBUG: user_oidc_group '#{user_oidc_group}' mapped to discourse_group '#{discourse_group}' added to user '#{user.username}'") if result && SiteSetting.openid_connect_verbose_log
@@ -115,9 +117,17 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     if SiteSetting.openid_connect_groups_remove_unmapped_groups
       check_groups.keys.each { |discourse_group|
         actual_group = Group.find_by(name: discourse_group)
-        next unless actual_group
-        next if actual_group.automatic # skip if it's an auto_group
-        next if check_groups[discourse_group] > 0
+        if !actual_group
+          Rails.logger.debug("DEBUG: discourse_group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          Rails.logger.debug("DEBUG: discourse_group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if check_groups[discourse_group] > 0
+          next
+        end
         result = actual_group.remove(user)
         Rails.logger.warn("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
       }
