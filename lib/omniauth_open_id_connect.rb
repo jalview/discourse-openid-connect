@@ -184,6 +184,8 @@ module ::OmniAuth
 
         userinfo_sub = @raw_info["sub"]
         id_token_sub = id_token_info["sub"]
+        verbose_log("##### if_token_info=\n#{id_token_info.to_yaml}")
+
         if userinfo_sub != id_token_sub
           raise SubVerifyError.new(
                   "OIDC `sub` mismatch. ID Token value: #{id_token_sub.inspect}. UserInfo value: #{userinfo_sub.inspect}",
@@ -208,6 +210,9 @@ module ::OmniAuth
 
       extra do
         hash = {}
+        verbose_log("##### options=\n#{options.to_yaml}")
+        verbose_log("##### userinfo_response=\n#{userinfo_response.to_yaml}")
+        verbose_log("##### id_token_info=\n#{id_token_info.to_yaml}")
         hash[:raw_info] = options.use_userinfo ? userinfo_response : id_token_info
         hash[:id_token] = access_token["id_token"]
         prune! hash
