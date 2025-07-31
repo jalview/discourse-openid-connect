@@ -218,6 +218,7 @@ module ::OmniAuth
         hash[:id_token] = access_token["id_token"]
         prune! hash
       end
+      verbose_log("##### extra=\n#{extra.to_yaml}")
 
       private
 
