@@ -70,6 +70,106 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     result
   end
 
+
+  # Start of crowd groups code insertion
+
+  def set_groups(user, auth)
+    return unless SiteSetting.openid_connect_groups_enabled
+
+    user_oidc_groups = (auth[:info] && auth[:info].groups) ? auth[:info].groups : nil
+    group_map = {}
+    check_groups = {}
+
+    SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
+      keyval = map.split(":", 2)
+      group_map[keyval[0]] = keyval[1]
+      keyval[1].split(",").each { |discourse_group|
+        check_groups[discourse_group] = 0
+      }
+    end
+
+    if !(user_oidc_groups == nil || group_map.empty?)
+      user_oidc_groups.each { |user_oidc_group|
+        if group_map.has_key?(user_oidc_group) #??? || !SiteSetting.openid_connect_groups_remove_unmapped_groups
+          result = nil
+
+          discourse_groups = group_map[user_oidc_group] || ""
+          discourse_groups.split(",").each { |discourse_group|
+            next unless discourse_group
+
+            check_groups[discourse_group] = 1
+            actual_group = Group.find_by(name: discourse_group)
+            if (!actual_group)
+              oidc_log("OIDC group '#{user_oidc_group}' maps to Group '#{discourse_group}' but this does not seem to exist")
+              next
+            end
+            if actual_group.automatic # skip if it's an auto_group
+              oidc_log("Group '#{discourse_group}' is an automatic group so membership cannot is unchanged")
+            end
+            result = actual_group.add(user)
+            oidc_log("OIDC group '#{user_oidc_group}' mapped to Group '#{discourse_group}'. User '#{user.username}' has been added") if result && SiteSetting.openid_connect_verbose_log
+          }
+        end
+      }
+    end
+
+    if SiteSetting.openid_connect_groups_remove_unmapped_groups
+      check_groups.keys.each { |discourse_group|
+        actual_group = Group.find_by(name: discourse_group)
+        if !actual_group
+          oidc_log("DEBUG: Group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          oidc_log("DEBUG: Group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if check_groups[discourse_group] > 0
+          next
+        end
+        result = actual_group.remove(user)
+        oidc_log("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
+      }
+    end
+  end
+
+  def after_authenticate(auth)
+
+    oidc_uid = auth[:uid]
+    oidc_info = auth[:info]
+    result = Auth::Result.new
+    result.email_valid = true
+
+    ## Allow setting to decide whether to validate email or not. Some Jira setups don't.
+    #result.email_valid = SiteSetting.openid_connect_validate_email
+    result.user = User.where(username: oidc_info.nickname).first
+    oidc_log("Found existing user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
+
+    if (!result.user)
+      result.user = User.new
+      result.user.name = oidc_info.name
+      result.user.username = oidc_uid
+      result.user.email = oidc_info.email
+      result.user.save
+      oidc_log("Created new user #{result.user.pretty_inspect}") if result && result.user && SiteSetting.openid_connect_verbose_log
+    end
+    oidc_log("Auth info is #{auth.pretty_inspect}") if auth && SiteSetting.openid_connect_verbose_log
+    oidc_log("Collected OIDC Info #{oidc_info.pretty_inspect}") if oidc_info && SiteSetting.openid_connect_verbose_log
+
+    set_groups(result.user, auth)
+    result
+  end
+
+  def after_create_account(user, auth)
+    set_groups(user, auth)
+  end
+
+
+
+
+  # End of crowd groups code insertion
+
+
   def oidc_log(message, error: false)
     if error
       Rails.logger.error("OIDC Log: #{message}")

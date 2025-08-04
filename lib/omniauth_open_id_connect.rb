@@ -184,6 +184,7 @@ module ::OmniAuth
 
         userinfo_sub = @raw_info["sub"]
         id_token_sub = id_token_info["sub"]
+
         if userinfo_sub != id_token_sub
           raise SubVerifyError.new(
                   "OIDC `sub` mismatch. ID Token value: #{id_token_sub.inspect}. UserInfo value: #{userinfo_sub.inspect}",
@@ -203,6 +204,7 @@ module ::OmniAuth
           last_name: data_source["family_name"],
           nickname: data_source["preferred_username"],
           image: data_source["picture"],
+          groups: data_source["groups"],
         )
       end
 
