@@ -44,7 +44,7 @@ discourse_openid_connect:
   openid_connect_groups_enabled:
     default: false
     client: true
-  openid_connect_groups_mapping:
+  openid_connect_groups_maps:
     default: ""
     type: list
     list_type: simple
@@ -56,12 +56,12 @@ discourse_openid_connect:
     default: ""
   openid_connect_gitlab_api_private_token:
     default: ""
-    type: secret
-  opendid_connect_groups_gitlab_repository_role_mapping:
+    secret: true
+  opendid_connect_groups_gitlab_repository_role_maps:
     default: ""
     type: list
     list_type: simple
-  opendid_connect_gitlab_remove_unmapped:
+  opendid_connect_gitlab_remove_unmapped_groups:
     default: true
   openid_connect_gitlab_api_verbose_log:
     default: false

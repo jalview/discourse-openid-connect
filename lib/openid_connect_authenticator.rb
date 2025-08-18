@@ -73,7 +73,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
   # Start of crowd groups code insertion
 
-  def check_gitlab_user_exists(gitlab_api_uri, private_token, username)
+  def get_gitlab_user_id(gitlab_api_uri, private_token, username)
     user_id = -1
     token_hash = { :private_token => private_token }
 
@@ -139,7 +139,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     group_map = {}
     check_groups = {}
 
-    SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
+    SiteSetting.openid_connect_groups_maps.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
       keyval[1].split(",").each { |discourse_group|
@@ -156,15 +156,16 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
           discourse_groups.split(",").each { |discourse_group|
             next unless discourse_group
 
-            check_groups[discourse_group] = 1
             actual_group = Group.find_by(name: discourse_group)
             if (!actual_group)
               oidc_log("OIDC group '#{user_oidc_group}' maps to Group '#{discourse_group}' but this does not seem to exist")
               next
             end
             if actual_group.automatic # skip if it's an auto_group
-              oidc_log("Group '#{discourse_group}' is an automatic group so membership cannot is unchanged")
+              oidc_log("Group '#{discourse_group}' is an automatic, cannot change membership")
+              next
             end
+            check_groups[discourse_group] = 1
             result = actual_group.add(user)
             oidc_log("OIDC group '#{user_oidc_group}' mapped to Group '#{discourse_group}'. User '#{user.username}' has been added") if result && SiteSetting.openid_connect_verbose_log
           }
@@ -175,6 +176,9 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     if SiteSetting.openid_connect_groups_remove_unmapped_groups
       check_groups.keys.each { |discourse_group|
         actual_group = Group.find_by(name: discourse_group)
+        if check_groups[discourse_group] > 0
+          next
+        end
         if !actual_group
           oidc_log("DEBUG: Group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
           next
@@ -183,45 +187,106 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
           oidc_log("DEBUG: Group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
           next
         end
-        if check_groups[discourse_group] > 0
-          next
-        end
         result = actual_group.remove(user)
         oidc_log("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
       }
     end
   end
 
+  def set_gitlab_mapped_groups(user, auth)
+    return false unless SiteSetting.openid_connect_gitlab_override_if_user_exists
+
+    gitlab_api_uri = SiteSetting.openid_connect_gitlab_api_base || GlobalSetting.try(:openid_connect_gitlab_api_base)
+    gitlab_api_private_token = SiteSetting.openid_connect_gitlab_api_private_token || GlobalSetting.try(:openid_connect_gitlab_api_private_token)
+    gitlab_user = user.username
+
+    gitlab_user_id = get_gitlab_user_id(gitlab_api_uri, gitlab_api_private_token, gitlab_user)
+
+    return false unless gitlab_user_id < 0
+
+    group_map = {}
+    check_groups = {}
+
+    SiteSetting.openid_connect_groups_maps.split("|").each do |map|
+      keyval = map.split(":", 2)
+      group_map[keyval[0]] = keyval[1]
+      keyval[1].split(",").each { |discourse_group|
+        check_groups[discourse_group] = 0
+      }
+    end
+
+    add_groups = {}
+
+    group_map.keys.each do |role_repo_string|
+      discourse_groups = group_map[role_repo_string] || ""
+      discourse_groups.split(",").each do |discourse_group|
+        next unless discourse_group
+
+        add_these_groups = []
+
+        actual_group = Group.find_by(name: discourse_group)
+        if (!actual_group)
+          oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{discourse_group}' but this does not seem to exist")
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          oidc_log("Group '#{discourse_group}' is an automatic, cannot change membership")
+          next
+        end
+        add_these_groups.push(actual_group)
+      end
+
+      if add_these_groups.length > 0
+        role_repo = role_repo_string.split(";", 2)
+        has_access = get_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
+        if has_access
+          add_these_groups.each do |actual_group|
+            add_groups[actual_group] = 1
+            oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{actual_group.name}'. User '#{user.username}' will be added") if SiteSetting.openid_connect_verbose_log
+            check_groups[actual_group.name] = 1
+          end
+        end
+      end
+    end
+
+    add_groups.keys.each do |actual_group|
+      result = actual_group.add(user)
+      oidc_log("Adding User '#{user.username}' to Group '#{actual_group.name}'") if result && SiteSetting.openid_connect_verbose_log
+    end
+
+    if SiteSetting.opendid_connect_gitlab_remove_unmapped_groups
+      check_groups.keys.each { |discourse_group|
+        if check_groups[discourse_group] > 0
+          next
+        end
+        actual_group = Group.find_by(name: discourse_group)
+        if !actual_group
+          oidc_log("DEBUG: Group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          oidc_log("DEBUG: Group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        result = actual_group.remove(user)
+        oidc_log("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
+      }
+    end
+
+    return true
+  end
+
   def set_groups(user, auth)
     do_oidc_groups = true
 
     # gitlab
-    if SiteSetting.openid_connect_gitlab_override_if_user_exists do
-      gitlab_api_uri = SiteSetting.openid_connect_gitlab_api_base || GlobalSetting.try(:openid_connect_gitlab_api_base)
-      gitlab_api_private_token = SiteSetting.openid_connect_gitlab_api_private_token || GlobalSetting.try(:openid_connect_gitlab_api_private_token)
-      gitlab_user = user.username
-      gitlab_user_exists = check_gitlab_user_exists(gitlab_api_uri, gitlab_api_private_token, gitlab_user)
-      if gitlab_user_exists do
-        do_oidc_groups = false
-
-        group_map = {}
-        check_groups = {}
-
-        SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
-          keyval = map.split(":", 2)
-          group_map[keyval[0]] = keyval[1]
-          keyval[1].split(",").each { |discourse_group|
-            check_groups[discourse_group] = 0
-          }
-        end
-
-
-
-      end
+    if SiteSetting.openid_connect_gitlab_override_if_user_exists
+      do_oidc_groups = not set_gitlab_mapped_groups(user, auth)
     end
 
     # oidc
-    if do_oidc_groups do
+    if do_oidc_groups and SiteSetting.openid_connect_groups_enabled
+      set_oidc_mapped_groups(user, auth)
     end
   end
 
