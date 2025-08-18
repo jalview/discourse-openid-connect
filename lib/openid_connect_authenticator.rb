@@ -277,15 +277,15 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
   end
 
   def set_groups(user, auth)
-    do_oidc_groups = true
+    has_gitlab_user = false
 
     # gitlab
     if SiteSetting.openid_connect_gitlab_override_if_user_exists
-      do_oidc_groups = not set_gitlab_mapped_groups(user, auth)
+      has_gitlab_user = set_gitlab_mapped_groups(user, auth)
     end
 
     # oidc
-    if do_oidc_groups and SiteSetting.openid_connect_groups_enabled
+    if !has_gitlab_user and SiteSetting.openid_connect_groups_enabled
       set_oidc_mapped_groups(user, auth)
     end
   end
