@@ -255,9 +255,10 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
       if add_these_groups.length > 0
         begin
+          projectname = role_repo[1]
           min_access_level = Integer(role_repo[0])
           oidc_log("DEBUG: min_access_level=#{min_access_level}. Class is '#{min_access_level.class}'.") if SiteSetting.openid_connect_verbose_log
-          has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
+          has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, projectname, min_access_level)
           if has_access
             add_these_groups.each do |actual_group|
               add_groups[actual_group] = 1
