@@ -201,7 +201,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
           next
         end
         result = actual_group.remove(user)
-        oidc_log("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
+        oidc_log("DEBUG: User '#{user.username}' removed from Group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
       }
     end
   end
