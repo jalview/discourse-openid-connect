@@ -73,13 +73,19 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
   # Start of crowd groups code insertion
 
+  def redact_uri(uri)
+    redacted_uri = uri
+    redacted_uri.query = URI.encode_www_form( Hash[URI.decode_www_form(uri.query)].merge( { "private_token" => "xxxxxx" } ) )
+    return redacted_uri
+  end
+
   def get_gitlab_user_id(gitlab_api_uri, private_token, username)
     user_id = -1
     token_hash = { :private_token => private_token }
 
     user_uri = URI("#{gitlab_api_uri}/users")
     user_uri.query = URI.encode_www_form( token_hash.merge({ :username => username, :humans => "true", :active => "false" }) )
-    oidc_log("GET #{user_uri}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+    oidc_log("GET #{redact_uri(user_uri).to_s}") if SiteSetting.openid_connect_gitlab_api_verbose_log
 
     connection =
       Faraday.new(request: { timeout: 10 }) do |c|
@@ -107,7 +113,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     token_hash = { :private_token => private_token }
     repo_uri = URI("#{gitlab_api_uri}/projects/#{URI.encode_www_form_component(repo_string)}/members/all/#{user_id}")
     repo_uri.query = URI.encode_www_form( token_hash )
-    oidc_log("GET #{repo_uri}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+    oidc_log("GET #{redact_uri(repo_uri).to_s}") if SiteSetting.openid_connect_gitlab_api_verbose_log
     repo_json = JSON.parse(connection.get( repo_uri ).body)
 
     access_level = 0
@@ -201,8 +207,9 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     gitlab_user = user.username
 
     gitlab_user_id = get_gitlab_user_id(gitlab_api_uri, gitlab_api_private_token, gitlab_user)
+    oidc_log("User '#{user.name}' has Gitlab User ID #{gitlab_user_id}")
 
-    return false unless gitlab_user_id < 0
+    return false if gitlab_user_id < 0
 
     group_map = {}
     check_groups = {}
