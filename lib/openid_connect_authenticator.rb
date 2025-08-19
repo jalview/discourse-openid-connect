@@ -73,14 +73,86 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
   # Start of crowd groups code insertion
 
-  def set_groups(user, auth)
+  def redact_uri(uri)
+    redacted_uri = uri.clone
+    redacted_uri.query = URI.encode_www_form( Hash[URI.decode_www_form(uri.query)].merge( { "private_token" => "xxxxxx" } ) )
+    return redacted_uri
+  end
+
+  def get_gitlab_user_id(gitlab_api_uri, private_token, username)
+    user_id = -1
+    token_hash = { :private_token => private_token }
+
+    user_uri = URI("#{gitlab_api_uri}/users")
+    user_uri.query = URI.encode_www_form( token_hash.merge({ :username => username, :humans => "true", :active => "false" }) )
+    oidc_log("GET #{redact_uri(user_uri).to_s}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+
+    connection =
+      Faraday.new(request: { timeout: 10 }) do |c|
+        c.use Faraday::Response::RaiseError
+        c.adapter FinalDestination::FaradayAdapter
+      end
+
+    user_json = JSON.parse(connection.get(user_uri).body)
+
+    if (user_json.kind_of?(Array) and user_json.length > 0)
+      user_json = user_json[0]
+      oidc_log("User JSON=#{user_json}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      user_id = user_json["id"]
+      oidc_log("User ID=#{user_id}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+    else
+      oidc_log("No user data returned") if SiteSetting.openid_connect_gitlab_api_verbose_log
+    end
+  rescue Faraday::Error, JSON::ParserError => e
+    oidc_log("Fetching from gitlab api raised error #{e.class} #{e.message}", error: true) if SiteSetting.openid_connect_gitlab_api_verbose_log
+  ensure
+    return user_id
+  end
+
+  def check_gitlab_user_has_access(gitlab_api_uri, private_token, user_id, repo_string, min_access_level)
+    token_hash = { :private_token => private_token }
+    repo_uri = URI("#{gitlab_api_uri}/projects/#{URI.encode_www_form_component(repo_string)}/members/all/#{user_id}")
+    repo_uri.query = URI.encode_www_form( token_hash )
+    oidc_log("GET #{redact_uri(repo_uri).to_s}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+
+    connection =
+      Faraday.new(request: { timeout: 10 }) do |c|
+        c.use Faraday::Response::RaiseError
+        c.adapter FinalDestination::FaradayAdapter
+      end
+
+      repo_json = JSON.parse(connection.get( repo_uri ).body)
+
+    access_level = 0
+    if (repo_json.kind_of?(Hash) and repo_json.key?("access_level"))
+      oidc_log("Repo JSON=#{repo_json}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      oidc_log("Access Level: #{repo_json["access_level"]}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      access_level = repo_json["access_level"]
+    else
+      oidc_log("No user info for repo") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      return false
+    end
+
+    if (access_level >= min_access_level)
+      oidc_log("User ID #{user_id} HAS minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      return true
+    else
+      oidc_log("User ID #{user_id} DOES NOT have minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      return false
+    end
+  rescue Faraday::Error, JSON::ParserError => e
+    oidc_log("Fetching from gitlab api raised error #{e.class} #{e.message}", error: true)
+    return false
+  end
+
+  def set_oidc_mapped_groups(user, auth)
     return unless SiteSetting.openid_connect_groups_enabled
 
     user_oidc_groups = (auth[:info] && auth[:info].groups) ? auth[:info].groups : nil
     group_map = {}
     check_groups = {}
 
-    SiteSetting.openid_connect_groups_mapping.split("|").each do |map|
+    SiteSetting.openid_connect_groups_maps.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
       keyval[1].split(",").each { |discourse_group|
@@ -97,15 +169,16 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
           discourse_groups.split(",").each { |discourse_group|
             next unless discourse_group
 
-            check_groups[discourse_group] = 1
             actual_group = Group.find_by(name: discourse_group)
             if (!actual_group)
               oidc_log("OIDC group '#{user_oidc_group}' maps to Group '#{discourse_group}' but this does not seem to exist")
               next
             end
             if actual_group.automatic # skip if it's an auto_group
-              oidc_log("Group '#{discourse_group}' is an automatic group so membership cannot is unchanged")
+              oidc_log("Group '#{discourse_group}' is an automatic, cannot change membership")
+              next
             end
+            check_groups[discourse_group] = 1
             result = actual_group.add(user)
             oidc_log("OIDC group '#{user_oidc_group}' mapped to Group '#{discourse_group}'. User '#{user.username}' has been added") if result && SiteSetting.openid_connect_verbose_log
           }
@@ -116,6 +189,9 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     if SiteSetting.openid_connect_groups_remove_unmapped_groups
       check_groups.keys.each { |discourse_group|
         actual_group = Group.find_by(name: discourse_group)
+        if check_groups[discourse_group] > 0
+          next
+        end
         if !actual_group
           oidc_log("DEBUG: Group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
           next
@@ -124,12 +200,116 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
           oidc_log("DEBUG: Group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
           next
         end
+        result = actual_group.remove(user)
+        oidc_log("DEBUG: User '#{user.username}' removed from Group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
+      }
+    end
+  end
+
+  def set_gitlab_mapped_groups(user, auth)
+    return false unless SiteSetting.openid_connect_gitlab_override_if_user_exists
+
+    gitlab_api_uri = SiteSetting.openid_connect_gitlab_api_base || GlobalSetting.try(:openid_connect_gitlab_api_base)
+    gitlab_api_private_token = SiteSetting.openid_connect_gitlab_api_private_token || GlobalSetting.try(:openid_connect_gitlab_api_private_token)
+    gitlab_user = user.username
+
+    gitlab_user_id = get_gitlab_user_id(gitlab_api_uri, gitlab_api_private_token, gitlab_user)
+    oidc_log("User '#{user.username}' has Gitlab User ID #{gitlab_user_id}")
+
+    return false if gitlab_user_id < 0
+
+    group_map = {}
+    check_groups = {}
+
+    SiteSetting.openid_connect_groups_gitlab_repository_role_maps.split("|").each do |map|
+      keyval = map.split(":", 2)
+      group_map[keyval[0]] = keyval[1]
+      keyval[1].split(",").each do |discourse_group|
+        check_groups[discourse_group] = 0
+      end
+    end
+
+    add_groups = {}
+
+    group_map.keys.each do |role_repo_string|
+      discourse_groups = group_map[role_repo_string] || ""
+      role_repo = role_repo_string.split(";", 2)
+      oidc_log("DEBUG: role_repo_string='#{role_repo_string}'. role_repo=#{role_repo}.") if SiteSetting.openid_connect_verbose_log
+
+      add_these_groups = []
+
+      discourse_groups.split(",").each do |discourse_group|
+        next unless discourse_group
+
+        actual_group = Group.find_by(name: discourse_group)
+        if (!actual_group)
+          oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{discourse_group}' but this does not seem to exist")
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          oidc_log("Group '#{discourse_group}' is an automatic, cannot change membership")
+          next
+        end
+        add_these_groups.push(actual_group)
+      end
+
+      if add_these_groups.length > 0
+        begin
+          projectname = role_repo[1]
+          min_access_level = Integer(role_repo[0])
+          oidc_log("DEBUG: min_access_level=#{min_access_level}. Class is '#{min_access_level.class}'.") if SiteSetting.openid_connect_verbose_log
+          has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, projectname, min_access_level)
+          if has_access
+            add_these_groups.each do |actual_group|
+              add_groups[actual_group] = 1
+              oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{actual_group.name}'. User '#{user.username}' will be added") if SiteSetting.openid_connect_verbose_log
+              check_groups[actual_group.name] = 1
+            end
+          end
+        rescue ArgumentError => e
+          oidc_log("Checking Gitlab minimum access level raised error #{e.class} #{e.message}", error: true)
+        end
+      end
+    end
+
+    add_groups.keys.each do |actual_group|
+      result = actual_group.add(user)
+      oidc_log("Adding User '#{user.username}' to Group '#{actual_group.name}'") if result && SiteSetting.openid_connect_verbose_log
+    end
+
+    if SiteSetting.openid_connect_gitlab_remove_unmapped_groups
+      check_groups.keys.each { |discourse_group|
         if check_groups[discourse_group] > 0
+          next
+        end
+        actual_group = Group.find_by(name: discourse_group)
+        if !actual_group
+          oidc_log("DEBUG: Group '#{discourse_group}' can't be found, cannot remove user '#{user.username}'") if SiteSetting.openid_connect_verbose_log
+          next
+        end
+        if actual_group.automatic # skip if it's an auto_group
+          oidc_log("DEBUG: Group '#{discourse_group}' is automatic, cannot change membership") if SiteSetting.openid_connect_verbose_log
           next
         end
         result = actual_group.remove(user)
         oidc_log("DEBUG: User '#{user.username}' removed from discourse_group '#{discourse_group}'") if result && SiteSetting.openid_connect_verbose_log
       }
+    end
+
+    return true
+  end
+
+  def set_groups(user, auth)
+    has_gitlab_user = false
+
+    # gitlab
+    if SiteSetting.openid_connect_gitlab_override_if_user_exists
+      has_gitlab_user = set_gitlab_mapped_groups(user, auth)
+    end
+
+    # oidc
+    if !has_gitlab_user and SiteSetting.openid_connect_groups_enabled
+      set_oidc_mapped_groups(user, auth)
     end
   end
 
