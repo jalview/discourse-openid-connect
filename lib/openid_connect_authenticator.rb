@@ -253,18 +253,19 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       end
 
       if add_these_groups.length > 0
-        min_access_level = Integer(role_repo[0])
-        has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
-        if has_access
-          add_these_groups.each do |actual_group|
-            add_groups[actual_group] = 1
-            oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{actual_group.name}'. User '#{user.username}' will be added") if SiteSetting.openid_connect_verbose_log
-            check_groups[actual_group.name] = 1
+        begin
+          min_access_level = Integer(role_repo[0])
+          has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
+          if has_access
+            add_these_groups.each do |actual_group|
+              add_groups[actual_group] = 1
+              oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{actual_group.name}'. User '#{user.username}' will be added") if SiteSetting.openid_connect_verbose_log
+              check_groups[actual_group.name] = 1
+            end
           end
+        rescue ArgumentError => e
+          oidc_log("Checking Gitlab minimum access level raised error #{e.class} #{e.message}", error: true)
         end
-      rescue ArgumentError => e
-        oidc_log("Checking Gitlab minimum access level raised error #{e.class} #{e.message}", error: true)
-        return false
       end
     end
 
