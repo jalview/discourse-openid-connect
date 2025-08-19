@@ -134,10 +134,10 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     end
 
     if (access_level >= min_access_level)
-      oidc_log("User #{username} HAS minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      oidc_log("User ID #{user_id} HAS minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
       return true
     else
-      oidc_log("User #{username} DOES NOT have minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
+      oidc_log("User ID #{user_id} DOES NOT have minimum access to #{repo_string}") if SiteSetting.openid_connect_gitlab_api_verbose_log
       return false
     end
   rescue Faraday::Error, JSON::ParserError => e
