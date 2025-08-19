@@ -246,7 +246,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       end
 
       if add_these_groups.length > 0
-        has_access = get_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
+        has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
         if has_access
           add_these_groups.each do |actual_group|
             add_groups[actual_group] = 1
