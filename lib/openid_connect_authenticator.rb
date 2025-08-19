@@ -207,7 +207,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     gitlab_user = user.username
 
     gitlab_user_id = get_gitlab_user_id(gitlab_api_uri, gitlab_api_private_token, gitlab_user)
-    oidc_log("User '#{user.name}' has Gitlab User ID #{gitlab_user_id}")
+    oidc_log("User '#{user.username}' has Gitlab User ID #{gitlab_user_id}")
 
     return false if gitlab_user_id < 0
 
@@ -217,20 +217,22 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     SiteSetting.openid_connect_groups_gitlab_repository_role_maps.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
-      keyval[1].split(",").each { |discourse_group|
+      keyval[1].split(",").each do |discourse_group|
         check_groups[discourse_group] = 0
-      }
+      end
     end
 
     add_groups = {}
 
     group_map.keys.each do |role_repo_string|
       discourse_groups = group_map[role_repo_string] || ""
+      role_repo = role_repo_string.split(";", 2)
+
       add_these_groups = []
+
       discourse_groups.split(",").each do |discourse_group|
         next unless discourse_group
 
-        role_repo = role_repo_string.split(";", 2)
         actual_group = Group.find_by(name: discourse_group)
         if (!actual_group)
           oidc_log("Gitlab role/repo '#{role_repo[0]}/#{role_repo[1]}' maps to Group '#{discourse_group}' but this does not seem to exist")
