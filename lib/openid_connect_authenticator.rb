@@ -74,7 +74,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
   # Start of crowd groups code insertion
 
   def redact_uri(uri)
-    redacted_uri = uri
+    redacted_uri = uri.clone
     redacted_uri.query = URI.encode_www_form( Hash[URI.decode_www_form(uri.query)].merge( { "private_token" => "xxxxxx" } ) )
     return redacted_uri
   end
