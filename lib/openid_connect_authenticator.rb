@@ -114,7 +114,14 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     repo_uri = URI("#{gitlab_api_uri}/projects/#{URI.encode_www_form_component(repo_string)}/members/all/#{user_id}")
     repo_uri.query = URI.encode_www_form( token_hash )
     oidc_log("GET #{redact_uri(repo_uri).to_s}") if SiteSetting.openid_connect_gitlab_api_verbose_log
-    repo_json = JSON.parse(connection.get( repo_uri ).body)
+
+    connection =
+      Faraday.new(request: { timeout: 10 }) do |c|
+        c.use Faraday::Response::RaiseError
+        c.adapter FinalDestination::FaradayAdapter
+      end
+
+      repo_json = JSON.parse(connection.get( repo_uri ).body)
 
     access_level = 0
     if (repo_json.kind_of?(Hash) and repo_json.key?("access_level"))
