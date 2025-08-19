@@ -23,8 +23,8 @@ en:
     openid_connect_groups_remove_unmapped_groups: "If user is not in any OpenID Connect group that maps to a discourse group, remove existing membership from that discourse group.  Only groups set in openid_connect_groups_maps will be removed."
     openid_connect_gitlab_override_if_user_exists: "If the user exists in gitlab, use group membership decisions from that and ignore the OpenID Connect group membership."
     openid_connect_gitlab_api_base: "API base for your gitlab instance, e.g. https://gitlab.example.com/api/v4 ."
-    opendid_connect_groups_gitlab_repository_role_maps: "Discourse_group to Repository_name;minimum_role_value mapping (Developer value is 30, see https://docs.gitlab.com/api/members/ ), e.g 'excalibur_devs:30;Camelot/excalibur'"
-    opendid_connect_gitlab_remove_unmapped_groups: "Whether to remove group access if a 'Repository name:min role value' is not met."
+    openid_connect_groups_gitlab_repository_role_maps: "Discourse_group to Repository_name;minimum_role_value mapping (Developer value is 30, see https://docs.gitlab.com/api/members/ ), e.g 'excalibur_devs:30;Camelot/excalibur'"
+    openid_connect_gitlab_remove_unmapped_groups: "Whether to remove group access if a 'Repository name:min role value' is not met."
     openid_connect_gitlab_api_verbose_log: "Enable verbose logging of Gitlab API lookups"
   login:
     omniauth_error:

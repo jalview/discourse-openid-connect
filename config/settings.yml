@@ -57,11 +57,11 @@ discourse_openid_connect:
   openid_connect_gitlab_api_private_token:
     default: ""
     secret: true
-  opendid_connect_groups_gitlab_repository_role_maps:
+  openid_connect_groups_gitlab_repository_role_maps:
     default: ""
     type: list
     list_type: simple
-  opendid_connect_gitlab_remove_unmapped_groups:
+  openid_connect_gitlab_remove_unmapped_groups:
     default: true
   openid_connect_gitlab_api_verbose_log:
     default: false

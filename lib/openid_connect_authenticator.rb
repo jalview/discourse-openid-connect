@@ -207,7 +207,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     group_map = {}
     check_groups = {}
 
-    SiteSetting.openid_connect_groups_maps.split("|").each do |map|
+    SiteSetting.openid_connect_groups_gitlab_repository_role_maps.split("|").each do |map|
       keyval = map.split(":", 2)
       group_map[keyval[0]] = keyval[1]
       keyval[1].split(",").each { |discourse_group|
@@ -219,10 +219,10 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
 
     group_map.keys.each do |role_repo_string|
       discourse_groups = group_map[role_repo_string] || ""
+      add_these_groups = []
       discourse_groups.split(",").each do |discourse_group|
         next unless discourse_group
 
-        add_these_groups = []
 
         actual_group = Group.find_by(name: discourse_group)
         if (!actual_group)
@@ -254,7 +254,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       oidc_log("Adding User '#{user.username}' to Group '#{actual_group.name}'") if result && SiteSetting.openid_connect_verbose_log
     end
 
-    if SiteSetting.opendid_connect_gitlab_remove_unmapped_groups
+    if SiteSetting.openid_connect_gitlab_remove_unmapped_groups
       check_groups.keys.each { |discourse_group|
         if check_groups[discourse_group] > 0
           next
