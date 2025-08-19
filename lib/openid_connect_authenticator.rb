@@ -234,6 +234,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
     group_map.keys.each do |role_repo_string|
       discourse_groups = group_map[role_repo_string] || ""
       role_repo = role_repo_string.split(";", 2)
+      oidc_log("DEBUG: role_repo_string='#{role_repo_string}'. role_repo=#{role_repo}.") if SiteSetting.openid_connect_verbose_log
 
       add_these_groups = []
 
@@ -255,6 +256,7 @@ class OpenIDConnectAuthenticator < Auth::ManagedAuthenticator
       if add_these_groups.length > 0
         begin
           min_access_level = Integer(role_repo[0])
+          oidc_log("DEBUG: min_access_level=#{min_access_level}. Class is '#{min_access_level.class}'.") if SiteSetting.openid_connect_verbose_log
           has_access = check_gitlab_user_has_access(gitlab_api_uri, gitlab_api_private_token, gitlab_user_id, role_repo[1], role_repo[0])
           if has_access
             add_these_groups.each do |actual_group|
