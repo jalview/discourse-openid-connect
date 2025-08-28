@@ -12,6 +12,10 @@ discourse_openid_connect:
     default: false
   openid_connect_rp_initiated_logout_redirect:
     default: ""
+  openid_connect_rp_initiated_logout_send_client_id:
+    default: false
+  openid_connect_rp_initiated_logout_send_id_token_hint:
+    default: true
   openid_connect_allow_association_change:
     default: false
   openid_connect_overrides_email:

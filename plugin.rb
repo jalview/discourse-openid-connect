@@ -52,14 +52,21 @@ on(:before_session_destroy) do |data|
 
   params = URI.decode_www_form(String(uri.query))
 
-  params << ["id_token_hint", token]
+  if SiteSetting.openid_connect_rp_initiated_logout_send_id_token_hint
+    params << ["id_token_hint", token]
+    authenticator.oidc_log "Logout params: Added id_token_hint '#{token}'." if SiteSetting.openid_connect_verbose_logging
+  end
+
+  if SiteSetting.openid_connect_rp_initiated_logout_send_client_id
+    params << ["client_id", SiteSetting.openid_connect_client_id]
+    authenticator.oidc_log "Logout params: Added client_id '#{SiteSetting.openid_connect_client_id}'." if SiteSetting.openid_connect_verbose_logging
+  end
 
   post_logout_redirect = SiteSetting.openid_connect_rp_initiated_logout_redirect.presence
   params << ["post_logout_redirect_uri", post_logout_redirect] if post_logout_redirect
 
   if SiteSetting.openid_connect_verbose_logging
     authenticator.oidc_log "Logout params: Added post_logout_redirect_uri '#{post_logout_redirect}'." if post_logout_redirect
-    authenticator.oidc_log "Logout params: Added id_token_hint '#{token}'."
     authenticator.oidc_log "Logout: Using base uri '#{uri.to_s}'."
   end
 
