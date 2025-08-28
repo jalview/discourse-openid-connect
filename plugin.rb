@@ -57,8 +57,15 @@ on(:before_session_destroy) do |data|
   post_logout_redirect = SiteSetting.openid_connect_rp_initiated_logout_redirect.presence
   params << ["post_logout_redirect_uri", post_logout_redirect] if post_logout_redirect
 
+  if SiteSetting.openid_connect_verbose_logging
+    authenticator.oidc_log "Logout params: Added post_logout_redirect_uri '#{post_logout_redirect}'." if post_logout_redirect
+    authenticator.oidc_log "Logout params: Added id_token_hint '#{token}'."
+    authenticator.oidc_log "Logout: Using base uri '#{uri.to_s}'."
+  end
+
   uri.query = URI.encode_www_form(params)
   data[:redirect_url] = uri.to_s
+  authenticator.oidc_log "Logout: Redirected to '#{uri.to_s}'." if SiteSetting.openid_connect_verbose_logging
 end
 
 auth_provider authenticator: OpenIDConnectAuthenticator.new
