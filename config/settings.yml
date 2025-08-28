@@ -16,6 +16,8 @@ discourse_openid_connect:
     default: false
   openid_connect_rp_initiated_logout_send_id_token_hint:
     default: true
+  openid_connect_rp_initiated_logout_use_access_token:
+    default: false
   openid_connect_allow_association_change:
     default: false
   openid_connect_overrides_email:

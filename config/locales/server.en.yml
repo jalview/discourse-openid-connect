@@ -9,6 +9,7 @@ en:
     openid_connect_rp_initiated_logout_redirect: "(optional) The post_logout_redirect_uri which will be passed to the logout endpoint. If provided, it must be registered with the identity provider."
     openid_connect_rp_initiated_logout_send_client_id: "Send client_id parameter in query string of end_session_endpoint."
     openid_connect_rp_initiated_logout_send_id_token_hint: "Send id_token_hint parameter in query string of end_session_endpoint (Recommended!)."
+    openid_connect_rp_initiated_logout_use_access_token: "Use original access_token as id_token_hint."
     openid_connect_token_scope: "The scopes sent when requesting the token endpoint. The official specification does not require this."
     openid_connect_error_redirects: "If the callback error_reason contains the first parameter, the user will be redirected to the URL in the second parameter"
     openid_connect_allow_association_change: "Allow users to disconnect and reconnect their Discourse accounts from the OpenID Connect provider"

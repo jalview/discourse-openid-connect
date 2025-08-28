@@ -212,6 +212,7 @@ module ::OmniAuth
         hash = {}
         hash[:raw_info] = options.use_userinfo ? userinfo_response : id_token_info
         hash[:id_token] = access_token["id_token"]
+        hash[:oidc_access_token] = access_token["id_token"]
         verbose_log("ID Token: storing user ID Token '#{hash[:id_token]}'.")
         prune! hash
       end

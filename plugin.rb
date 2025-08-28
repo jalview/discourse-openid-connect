@@ -53,6 +53,10 @@ on(:before_session_destroy) do |data|
   params = URI.decode_www_form(String(uri.query))
 
   if SiteSetting.openid_connect_rp_initiated_logout_send_id_token_hint
+    if SiteSetting.openid_connect_rp_initiated_logout_use_access_token
+      token = oidc_record.extra["oidc_access_token"]
+      authenticator.oidc_log "Logout params: Using original access_token for id_token_hint." if SiteSetting.openid_connect_verbose_logging
+    end
     params << ["id_token_hint", token]
     authenticator.oidc_log "Logout params: Added id_token_hint '#{token}'." if SiteSetting.openid_connect_verbose_logging
   end
