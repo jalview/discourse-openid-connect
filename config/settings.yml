@@ -35,12 +35,10 @@ discourse_openid_connect:
     textarea: true
   openid_connect_match_by_email:
     default: true
+  openid_connect_match_by_username:
+    default: false
   openid_connect_use_pkce:
     default: false
-  openid_connect_verbose_log:
-    default: false
-  openid_connect_validate_email:
-    default: true
   openid_connect_groups_enabled:
     default: false
     client: true
